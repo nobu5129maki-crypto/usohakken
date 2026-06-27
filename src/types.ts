@@ -1,4 +1,4 @@
-export type Step = 'warning' | 'calibration' | 'ready' | 'question' | 'analyzing' | 'result'
+export type Step = 'warning' | 'calibration' | 'questionSetup' | 'ready' | 'question' | 'analyzing' | 'result'
 
 export interface TimingData {
   buttonPressStart: number | null

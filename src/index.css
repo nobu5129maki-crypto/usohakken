@@ -150,9 +150,122 @@ body {
 .icon-gear,
 .icon-ready,
 .icon-bolt,
-.icon-brain {
+.icon-brain,
+.icon-setup {
   font-size: 2rem;
   display: block;
+}
+
+/* ── Question Setup Step ── */
+
+.setup-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px;
+  background: rgba(0, 255, 136, 0.06);
+  border: 1px solid rgba(0, 255, 136, 0.25);
+  border-radius: 8px;
+}
+
+.setup-notice-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.setup-notice p {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--cyber-text);
+}
+
+.setup-notice strong {
+  color: var(--cyber-secondary);
+}
+
+.setup-count {
+  font-size: 0.85rem;
+  color: var(--cyber-dim);
+  text-align: center;
+}
+
+.setup-count strong {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--cyber-primary);
+}
+
+.setup-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setup-question-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: start;
+  padding: 10px;
+  background: rgba(0, 229, 255, 0.04);
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  border-radius: 8px;
+}
+
+.setup-q-label {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--cyber-primary);
+  padding-top: 10px;
+  flex-shrink: 0;
+}
+
+.setup-q-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 6px;
+  color: var(--cyber-text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 10px;
+  resize: vertical;
+  line-height: 1.5;
+  min-height: 60px;
+}
+
+.setup-q-input:focus {
+  outline: none;
+  border-color: var(--cyber-primary);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.15);
+}
+
+.setup-q-input::placeholder {
+  color: var(--cyber-dim);
+  opacity: 0.7;
+}
+
+.setup-remove-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 6px;
+  background: rgba(255, 50, 50, 0.1);
+  color: #ff6666;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.setup-remove-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .content-box {

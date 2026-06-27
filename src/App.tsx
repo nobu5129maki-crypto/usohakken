@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { WarningStep } from './components/WarningStep'
 import { CalibrationStep } from './components/CalibrationStep'
+import { QuestionSetupStep } from './components/QuestionSetupStep'
 import { ReadyStep } from './components/ReadyStep'
 import { QuestionStep } from './components/QuestionStep'
 import { AnalyzingStep } from './components/AnalyzingStep'
 import { ResultStep } from './components/ResultStep'
 import { InstallPrompt } from './components/InstallPrompt'
-import { SettingsPanel } from './components/SettingsPanel'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer'
 import {
   calculateLieProbability,
@@ -21,7 +21,6 @@ function App() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [results, setResults] = useState<QuestionResult[]>([])
   const [micError, setMicError] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
 
   const activeQuestions = useMemo(
     () => questions.map((q) => q.trim()).filter(Boolean),
@@ -48,6 +47,10 @@ function App() {
   }, [step, isReady, startAnalyzer])
 
   const handleCalibrationComplete = useCallback(() => {
+    setStep('questionSetup')
+  }, [])
+
+  const handleQuestionSetupComplete = useCallback(() => {
     setStep('ready')
   }, [])
 
@@ -85,7 +88,6 @@ function App() {
     setResults([])
     setCurrentQuestionIndex(0)
     setStep('warning')
-    setShowSettings(false)
   }, [resetTiming])
 
   const handleWarningNext = useCallback(() => {
@@ -116,24 +118,6 @@ function App() {
 
   return (
     <div className="app">
-      {step !== 'question' && step !== 'result' && step !== 'analyzing' && (
-        <button
-          className="settings-toggle"
-          onClick={() => setShowSettings((s) => !s)}
-          aria-label="設定"
-        >
-          ⚙️
-        </button>
-      )}
-
-      {showSettings && (
-        <SettingsPanel
-          questions={questions}
-          onChange={setQuestions}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
-
       {step === 'warning' && <WarningStep onNext={handleWarningNext} />}
 
       {step === 'calibration' && (
@@ -143,6 +127,14 @@ function App() {
           onButtonRelease={onButtonRelease}
           isButtonPressed={isButtonPressed}
           waveformData={waveformData}
+        />
+      )}
+
+      {step === 'questionSetup' && (
+        <QuestionSetupStep
+          questions={questions}
+          onChange={setQuestions}
+          onNext={handleQuestionSetupComplete}
         />
       )}
 
