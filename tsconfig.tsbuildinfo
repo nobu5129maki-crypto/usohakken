@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/analyzingstep.tsx","./src/components/calibrationstep.tsx","./src/components/questionstep.tsx","./src/components/readystep.tsx","./src/components/resultstep.tsx","./src/components/warningstep.tsx","./src/hooks/useaudioanalyzer.ts","./src/hooks/usecountdown.ts"],"version":"5.9.3"}
