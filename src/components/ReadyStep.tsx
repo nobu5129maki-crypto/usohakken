@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useCountdown } from '../hooks/useCountdown'
 
 interface ReadyStepProps {
+  questionCount: number
   onStart: () => void
 }
 
-export function ReadyStep({ onStart }: ReadyStepProps) {
+export function ReadyStep({ questionCount, onStart }: ReadyStepProps) {
   const [counting, setCounting] = useState(false)
 
   const countdown = useCountdown(3, counting, () => {
@@ -36,6 +37,7 @@ export function ReadyStep({ onStart }: ReadyStepProps) {
         </p>
 
         <p className="intro-text highlight-cyber">
+          全 {questionCount} 問の質問を順番に行います。
           準備ができたら、以下の「測定開始」をタップしてください。
           タップ直後、3秒間のカウントダウンの後に質問が表示されます。
         </p>

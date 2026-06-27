@@ -1,24 +1,32 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { WarningStep } from './components/WarningStep'
 import { CalibrationStep } from './components/CalibrationStep'
 import { ReadyStep } from './components/ReadyStep'
 import { QuestionStep } from './components/QuestionStep'
 import { AnalyzingStep } from './components/AnalyzingStep'
 import { ResultStep } from './components/ResultStep'
+import { InstallPrompt } from './components/InstallPrompt'
+import { SettingsPanel } from './components/SettingsPanel'
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer'
 import {
   calculateLieProbability,
-  DEFAULT_TARGET_QUESTION,
-  type AnalysisResult,
+  DEFAULT_TARGET_QUESTIONS,
+  type QuestionResult,
   type Step,
 } from './types'
 
 function App() {
   const [step, setStep] = useState<Step>('warning')
-  const [question, setQuestion] = useState(DEFAULT_TARGET_QUESTION)
-  const [result, setResult] = useState<AnalysisResult | null>(null)
+  const [questions, setQuestions] = useState<string[]>(DEFAULT_TARGET_QUESTIONS)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [results, setResults] = useState<QuestionResult[]>([])
   const [micError, setMicError] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+
+  const activeQuestions = useMemo(
+    () => questions.map((q) => q.trim()).filter(Boolean),
+    [questions],
+  )
 
   const {
     isReady,
@@ -45,22 +53,37 @@ function App() {
 
   const handleQuestionStart = useCallback(() => {
     resetTiming()
+    setCurrentQuestionIndex(0)
+    setResults([])
     setStep('question')
   }, [resetTiming])
 
   const handleQuestionComplete = useCallback(() => {
+    const currentQuestion = activeQuestions[currentQuestionIndex]
+    if (!currentQuestion) return
+
     const analysisResult = calculateLieProbability(getTiming())
-    setResult(analysisResult)
+    setResults((prev) => [
+      ...prev,
+      { question: currentQuestion, result: analysisResult },
+    ])
     setStep('analyzing')
-  }, [getTiming])
+  }, [activeQuestions, currentQuestionIndex, getTiming])
 
   const handleAnalyzingComplete = useCallback(() => {
     setStep('result')
   }, [])
 
+  const handleNextQuestion = useCallback(() => {
+    resetTiming()
+    setCurrentQuestionIndex((i) => i + 1)
+    setStep('question')
+  }, [resetTiming])
+
   const handleReset = useCallback(() => {
     resetTiming()
-    setResult(null)
+    setResults([])
+    setCurrentQuestionIndex(0)
     setStep('warning')
     setShowSettings(false)
   }, [resetTiming])
@@ -68,6 +91,9 @@ function App() {
   const handleWarningNext = useCallback(() => {
     setStep('calibration')
   }, [])
+
+  const isLastQuestion = currentQuestionIndex >= activeQuestions.length - 1
+  const currentQuestion = activeQuestions[currentQuestionIndex] ?? ''
 
   if (micError) {
     return (
@@ -90,7 +116,7 @@ function App() {
 
   return (
     <div className="app">
-      {step !== 'question' && step !== 'result' && (
+      {step !== 'question' && step !== 'result' && step !== 'analyzing' && (
         <button
           className="settings-toggle"
           onClick={() => setShowSettings((s) => !s)}
@@ -101,21 +127,11 @@ function App() {
       )}
 
       {showSettings && (
-        <div className="settings-panel">
-          <label className="settings-label">本番質問文</label>
-          <textarea
-            className="settings-input"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            rows={3}
-          />
-          <button
-            className="btn-primary btn-cyber btn-small"
-            onClick={() => setShowSettings(false)}
-          >
-            閉じる
-          </button>
-        </div>
+        <SettingsPanel
+          questions={questions}
+          onChange={setQuestions}
+          onClose={() => setShowSettings(false)}
+        />
       )}
 
       {step === 'warning' && <WarningStep onNext={handleWarningNext} />}
@@ -130,11 +146,19 @@ function App() {
         />
       )}
 
-      {step === 'ready' && <ReadyStep onStart={handleQuestionStart} />}
+      {step === 'ready' && (
+        <ReadyStep
+          questionCount={activeQuestions.length}
+          onStart={handleQuestionStart}
+        />
+      )}
 
-      {step === 'question' && (
+      {step === 'question' && currentQuestion && (
         <QuestionStep
-          question={question}
+          key={currentQuestionIndex}
+          question={currentQuestion}
+          questionIndex={currentQuestionIndex}
+          totalQuestions={activeQuestions.length}
           onComplete={handleQuestionComplete}
           onButtonPress={onButtonPress}
           onButtonRelease={onButtonRelease}
@@ -143,13 +167,26 @@ function App() {
         />
       )}
 
-      {step === 'analyzing' && result && (
-        <AnalyzingStep result={result} onComplete={handleAnalyzingComplete} />
+      {step === 'analyzing' && results.length > 0 && (
+        <AnalyzingStep
+          result={results[results.length - 1].result}
+          questionIndex={currentQuestionIndex}
+          totalQuestions={activeQuestions.length}
+          onComplete={handleAnalyzingComplete}
+        />
       )}
 
-      {step === 'result' && result && (
-        <ResultStep result={result} question={question} onReset={handleReset} />
+      {step === 'result' && results.length > 0 && (
+        <ResultStep
+          results={results}
+          isComplete={isLastQuestion}
+          totalQuestions={activeQuestions.length}
+          onNextQuestion={handleNextQuestion}
+          onReset={handleReset}
+        />
       )}
+
+      <InstallPrompt />
     </div>
   )
 }

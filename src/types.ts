@@ -18,13 +18,22 @@ export interface AnalysisResult {
   verdictLabel: string
 }
 
+export interface QuestionResult {
+  question: string
+  result: AnalysisResult
+}
+
 export const CALIBRATION_QUESTIONS = [
   'あなたは今、屋内にいますか？',
   '今日は {day} ですか？',
   'あなたの目の前にあるのはスマホですか？',
 ]
 
-export const DEFAULT_TARGET_QUESTION = 'あなたは今、嘘をついていますか？'
+export const DEFAULT_TARGET_QUESTIONS = [
+  'あなたは今、嘘をついていますか？',
+  '今日、誰かに嘘をつきましたか？',
+  '今の回答は全て本当ですか？',
+]
 
 export function getDayOfWeek(): string {
   const days = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日']

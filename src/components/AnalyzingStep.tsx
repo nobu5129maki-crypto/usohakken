@@ -3,6 +3,8 @@ import type { AnalysisResult } from '../types'
 
 interface AnalyzingStepProps {
   result: AnalysisResult
+  questionIndex: number
+  totalQuestions: number
   onComplete: () => void
 }
 
@@ -13,7 +15,12 @@ const ANALYSIS_LINES = [
   { text: '嘘の確率を算出しています。あと5秒お待ちください…', delay: 3800 },
 ]
 
-export function AnalyzingStep({ result, onComplete }: AnalyzingStepProps) {
+export function AnalyzingStep({
+  result,
+  questionIndex,
+  totalQuestions,
+  onComplete,
+}: AnalyzingStepProps) {
   const [visibleLines, setVisibleLines] = useState<number>(0)
   const [waitSeconds, setWaitSeconds] = useState(5)
 
@@ -48,7 +55,7 @@ export function AnalyzingStep({ result, onComplete }: AnalyzingStepProps) {
       <div className="scan-line" />
       <header className="step-header">
         <span className="icon-brain">🧠</span>
-        <h1>AI心拍・音声・応答速度 解析中...</h1>
+        <h1>Q{questionIndex + 1}/{totalQuestions} 解析中...</h1>
       </header>
 
       <div className="content-box">

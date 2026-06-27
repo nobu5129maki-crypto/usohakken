@@ -3,6 +3,8 @@ import { useCountdown } from '../hooks/useCountdown'
 
 interface QuestionStepProps {
   question: string
+  questionIndex: number
+  totalQuestions: number
   onComplete: () => void
   onButtonPress: () => void
   onButtonRelease: () => void
@@ -12,6 +14,8 @@ interface QuestionStepProps {
 
 export function QuestionStep({
   question,
+  questionIndex,
+  totalQuestions,
   onComplete,
   onButtonPress,
   onButtonRelease,
@@ -38,7 +42,7 @@ export function QuestionStep({
       <div className="alert-pulse" />
       <header className="step-header step-header-alert">
         <span className="icon-bolt">⚡️</span>
-        <h1>TARGET QUESTION</h1>
+        <h1>TARGET QUESTION {questionIndex + 1} / {totalQuestions}</h1>
       </header>
 
       <div className="content-box content-box-alert">
