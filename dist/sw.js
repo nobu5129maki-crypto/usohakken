@@ -1,1 +1,19 @@
-if(!self.define){let e,s={};const n=(n,i)=>(n=new URL(n+".js",i).href,s[n]||new Promise(s=>{if("document"in self){const e=document.createElement("script");e.src=n,e.onload=s,document.head.appendChild(e)}else e=n,importScripts(n),s()}).then(()=>{let e=s[n];if(!e)throw new Error(`Module ${n} didn’t register its module`);return e}));self.define=(i,o)=>{const c=e||("document"in self?document.currentScript.src:"")||location.href;if(s[c])return;let r={};const t=e=>n(e,c),l={module:{uri:c},exports:r,require:t};s[c]=Promise.all(i.map(e=>l[e]||t(e))).then(e=>(o(...e),r))}}define(["./workbox-dcde9eb3"],function(e){"use strict";self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"index.html",revision:"cd39ff1cbc598996dcd5ab81f9b00955"},{url:"apple-touch-icon.png",revision:"de52048ad9cb6741b8220b4563800012"},{url:"icons/icon-512x512.png",revision:"de52048ad9cb6741b8220b4563800012"},{url:"icons/icon-192x192.png",revision:"de52048ad9cb6741b8220b4563800012"},{url:"assets/workbox-window.prod.es5-BBnX5xw4.js",revision:null},{url:"assets/index-mbmi-xLI.js",revision:null},{url:"assets/index-Dvqz13WC.css",revision:null},{url:"assets/index-D1dvNVcr.js",revision:null},{url:"assets/index-D-xfIoBq.css",revision:null},{url:"assets/index-Cx2kNZHJ.js",revision:null},{url:"assets/index-CU074WId.css",revision:null},{url:"apple-touch-icon.png",revision:"de52048ad9cb6741b8220b4563800012"},{url:"icons/icon-192x192.png",revision:"de52048ad9cb6741b8220b4563800012"},{url:"icons/icon-512x512.png",revision:"de52048ad9cb6741b8220b4563800012"},{url:"manifest.webmanifest",revision:"e8f24e4a1a1d2bb66317f5cc2ffc7faa"}],{}),e.cleanupOutdatedCaches(),e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("index.html"))),e.registerRoute(/^https:\/\/fonts\.googleapis\.com\/.*/i,new e.CacheFirst({cacheName:"google-fonts-cache",plugins:[new e.ExpirationPlugin({maxEntries:10,maxAgeSeconds:31536e3})]}),"GET"),e.registerRoute(/^https:\/\/fonts\.gstatic\.com\/.*/i,new e.CacheFirst({cacheName:"gstatic-fonts-cache",plugins:[new e.ExpirationPlugin({maxEntries:10,maxAgeSeconds:31536e3})]}),"GET")});
+/* ログインの外に置くサービスワーカー。アプリ本体はキャッシュしない。 */
+self.addEventListener('install', function (event) {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', function (event) {
+  event.waitUntil(
+    caches.keys().then(function (keys) {
+      return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+    }).then(function () {
+      return self.clients.claim();
+    })
+  );
+});
+
+self.addEventListener('fetch', function (event) {
+  if (event.request.method !== 'GET') return;
+  event.respondWith(fetch(event.request));
+});

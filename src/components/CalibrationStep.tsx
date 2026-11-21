@@ -8,6 +8,7 @@ interface CalibrationStepProps {
   onButtonRelease: () => void
   isButtonPressed: boolean
   waveformData: number[]
+  textMode?: boolean
 }
 
 export function CalibrationStep({
@@ -16,10 +17,12 @@ export function CalibrationStep({
   onButtonRelease,
   isButtonPressed,
   waveformData,
+  textMode = false,
 }: CalibrationStepProps) {
   const [currentQ, setCurrentQ] = useState(0)
   const [analyzing, setAnalyzing] = useState(false)
   const [answered, setAnswered] = useState(false)
+  const [draft, setDraft] = useState('')
 
   const day = getDayOfWeek()
   const questions = CALIBRATION_QUESTIONS.map((q) =>
@@ -30,19 +33,28 @@ export function CalibrationStep({
     onNext()
   })
 
+  const advance = () => {
+    if (answered) return
+    setAnswered(true)
+    if (currentQ < questions.length - 1) {
+      setTimeout(() => {
+        setCurrentQ((c) => c + 1)
+        setAnswered(false)
+      }, 800)
+    } else {
+      setAnalyzing(true)
+    }
+  }
+
   const handleRelease = () => {
     onButtonRelease()
-    if (!answered) {
-      setAnswered(true)
-      if (currentQ < questions.length - 1) {
-        setTimeout(() => {
-          setCurrentQ((c) => c + 1)
-          setAnswered(false)
-        }, 800)
-      } else {
-        setAnalyzing(true)
-      }
-    }
+    advance()
+  }
+
+  const submitText = () => {
+    if (!draft.trim()) return
+    setDraft('')
+    advance()
   }
 
   return (
@@ -57,7 +69,12 @@ export function CalibrationStep({
         <p className="intro-text">
           あなたの平常時の精神状態と、音声の基本トーンを測定します。
           下記の「明らかな事実」について、
-          <strong>【ボタンを押しながら、声を出して】</strong>お答えください。
+          {textMode ? (
+            <strong>【文字で】</strong>
+          ) : (
+            <strong>【ボタンを押しながら、声を出して】</strong>
+          )}
+          お答えください。
         </p>
 
         <div className="question-list">
@@ -82,6 +99,21 @@ export function CalibrationStep({
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
             <p className="progress-label">{Math.round(progress)}%</p>
+          </div>
+        ) : textMode ? (
+          <div className="text-answer-box">
+            <p className="text-answer-note">マイクを使えないので、文字で回答します。</p>
+            <textarea
+              className="text-answer"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={2}
+              placeholder="はい / いいえ"
+              aria-label="文字での回答"
+            />
+            <button className="btn-primary btn-cyber" onClick={submitText} disabled={!draft.trim()}>
+              文字で回答する
+            </button>
           </div>
         ) : (
           <>

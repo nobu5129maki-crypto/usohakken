@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCountdown } from '../hooks/useCountdown'
 
 interface QuestionStepProps {
   question: string
   questionIndex: number
   totalQuestions: number
-  onComplete: () => void
+  onComplete: (answer?: string) => void
   onButtonPress: () => void
   onButtonRelease: () => void
   isButtonPressed: boolean
   waveformData: number[]
+  textMode?: boolean
+  onTextTiming?: (elapsedSeconds: number) => void
 }
 
 export function QuestionStep({
@@ -21,13 +23,22 @@ export function QuestionStep({
   onButtonRelease,
   isButtonPressed,
   waveformData,
+  textMode = false,
+  onTextTiming,
 }: QuestionStepProps) {
   const [showAnswer, setShowAnswer] = useState(false)
   const [answered, setAnswered] = useState(false)
+  const [draft, setDraft] = useState('')
+  const shownAt = useRef(0)
 
   const countdown = useCountdown(3, true, () => {
+    shownAt.current = Date.now()
     setShowAnswer(true)
   })
+
+  useEffect(() => {
+    if (showAnswer && shownAt.current === 0) shownAt.current = Date.now()
+  }, [showAnswer])
 
   const handleRelease = () => {
     onButtonRelease()
@@ -35,6 +46,15 @@ export function QuestionStep({
       setAnswered(true)
       setTimeout(() => onComplete(), 600)
     }
+  }
+
+  const submitText = () => {
+    const value = draft.trim()
+    if (!showAnswer || answered || !value) return
+    const elapsed = Math.max(0.05, (Date.now() - (shownAt.current || Date.now())) / 1000)
+    onTextTiming?.(elapsed)
+    setAnswered(true)
+    setTimeout(() => onComplete(value), 300)
   }
 
   return (
@@ -59,6 +79,7 @@ export function QuestionStep({
               <span className="answer-now-text">ANSWER NOW !!</span>
             </div>
 
+            {textMode ? null : (
             <div className="waveform-container waveform-alert">
               <div className="waveform">
                 {waveformData.map((v, i) => (
@@ -73,7 +94,24 @@ export function QuestionStep({
                 ))}
               </div>
             </div>
+            )}
 
+            {textMode ? (
+              <div className="text-answer-box">
+                <p className="text-answer-note">マイクを使えないので、文字で回答します。</p>
+                <textarea
+                  className="text-answer"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  rows={2}
+                  placeholder="はい / いいえ"
+                  aria-label="文字での回答"
+                />
+                <button className="btn-primary btn-start" onClick={submitText} disabled={!draft.trim()}>
+                  文字で回答する
+                </button>
+              </div>
+            ) : (
             <button
               className={`btn-measure btn-alert ${isButtonPressed ? 'pressed' : ''}`}
               onTouchStart={(e) => {
@@ -93,6 +131,7 @@ export function QuestionStep({
               <span className="btn-measure-icon">🔴</span>
               <span>測定ボタンを押しっぱなしにして声で回答してください</span>
             </button>
+            )}
           </>
         ) : (
           <div className="countdown-display countdown-alert">

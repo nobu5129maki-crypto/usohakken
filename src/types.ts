@@ -20,6 +20,7 @@ export interface AnalysisResult {
 
 export interface QuestionResult {
   question: string
+  answer?: string
   result: AnalysisResult
 }
 

@@ -36,6 +36,12 @@ function SingleResult({ item }: { item: QuestionResult }) {
     <>
       <p className="result-question-label">質問</p>
       <p className="result-question">{item.question}</p>
+      {item.answer ? (
+        <>
+          <p className="result-question-label">回答</p>
+          <p className="result-question">{item.answer}</p>
+        </>
+      ) : null}
 
       <div className="result-probability">
         <div className="probability-ring">
@@ -133,6 +139,7 @@ export function ResultStep({
               <div className="result-card-header">
                 <span className="result-card-num">Q{i + 1}</span>
                 <p className="result-card-question">{item.question}</p>
+                {item.answer ? <p className="result-card-question">回答: {item.answer}</p> : null}
               </div>
               <VerdictBadge result={item.result} />
               <div className="result-card-details">

@@ -13,6 +13,7 @@ interface UseAudioAnalyzerReturn {
   onButtonRelease: () => void
   resetTiming: () => void
   getTiming: () => TimingData
+  noteTextAnswer: (elapsedSeconds: number) => void
 }
 
 const EMPTY_TIMING: TimingData = {
@@ -192,6 +193,20 @@ export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
     setTiming({ ...EMPTY_TIMING })
   }, [])
 
+  const noteTextAnswer = useCallback((elapsedSeconds: number) => {
+    const elapsed = Math.max(0.05, elapsedSeconds)
+    const now = Date.now()
+    const elapsedMs = elapsed * 1000
+    timingRef.current.buttonPressStart = now - elapsedMs
+    timingRef.current.voiceStart = now - Math.min(elapsedMs, 400)
+    timingRef.current.voiceEnd = now
+    timingRef.current.buttonPressEnd = now
+    timingRef.current.responseDelay = Math.round(elapsed * 100) / 100
+    timingRef.current.voiceDuration = Math.round(Math.min(Math.max(elapsed, 0.3), 4) * 100) / 100
+    timingRef.current.holdMismatch = 0
+    setTiming({ ...timingRef.current })
+  }, [])
+
   useEffect(() => {
     return () => {
       stopAnalyzer()
@@ -212,5 +227,6 @@ export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
     onButtonRelease,
     resetTiming,
     getTiming,
+    noteTextAnswer,
   }
 }

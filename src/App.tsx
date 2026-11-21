@@ -20,7 +20,7 @@ function App() {
   const [questions, setQuestions] = useState<string[]>(DEFAULT_TARGET_QUESTIONS)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [results, setResults] = useState<QuestionResult[]>([])
-  const [micError, setMicError] = useState(false)
+  const [textMode, setTextMode] = useState(false)
 
   const activeQuestions = useMemo(
     () => questions.map((q) => q.trim()).filter(Boolean),
@@ -36,15 +36,22 @@ function App() {
     onButtonRelease,
     resetTiming,
     getTiming,
+    noteTextAnswer,
   } = useAudioAnalyzer()
 
   useEffect(() => {
-    if (step === 'calibration' && !isReady) {
-      startAnalyzer().then((ok) => {
-        if (!ok) setMicError(true)
-      })
+    if (step !== 'calibration' || isReady || textMode) return
+    let cancelled = false
+    const timeout = new Promise<boolean>((resolve) => {
+      window.setTimeout(() => resolve(false), 8000)
+    })
+    Promise.race([startAnalyzer(), timeout]).then((ok) => {
+      if (!cancelled && !ok) setTextMode(true)
+    })
+    return () => {
+      cancelled = true
     }
-  }, [step, isReady, startAnalyzer])
+  }, [step, isReady, textMode, startAnalyzer])
 
   const handleCalibrationComplete = useCallback(() => {
     setStep('questionSetup')
@@ -61,14 +68,14 @@ function App() {
     setStep('question')
   }, [resetTiming])
 
-  const handleQuestionComplete = useCallback(() => {
+  const handleQuestionComplete = useCallback((answer?: string) => {
     const currentQuestion = activeQuestions[currentQuestionIndex]
     if (!currentQuestion) return
 
     const analysisResult = calculateLieProbability(getTiming())
     setResults((prev) => [
       ...prev,
-      { question: currentQuestion, result: analysisResult },
+      { question: currentQuestion, answer, result: analysisResult },
     ])
     setStep('analyzing')
   }, [activeQuestions, currentQuestionIndex, getTiming])
@@ -97,25 +104,6 @@ function App() {
   const isLastQuestion = currentQuestionIndex >= activeQuestions.length - 1
   const currentQuestion = activeQuestions[currentQuestionIndex] ?? ''
 
-  if (micError) {
-    return (
-      <div className="app">
-        <div className="step step-cyber">
-          <div className="content-box">
-            <h1>マイクへのアクセスが必要です</h1>
-            <p className="intro-text">
-              このアプリは音声解析を行うため、マイクの使用許可が必要です。
-              ブラウザの設定からマイクを許可して、ページを再読み込みしてください。
-            </p>
-            <button className="btn-primary btn-cyber" onClick={() => window.location.reload()}>
-              再読み込み
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="app">
       {step === 'warning' && <WarningStep onNext={handleWarningNext} />}
@@ -127,6 +115,7 @@ function App() {
           onButtonRelease={onButtonRelease}
           isButtonPressed={isButtonPressed}
           waveformData={waveformData}
+          textMode={textMode}
         />
       )}
 
@@ -156,6 +145,8 @@ function App() {
           onButtonRelease={onButtonRelease}
           isButtonPressed={isButtonPressed}
           waveformData={waveformData}
+          textMode={textMode}
+          onTextTiming={noteTextAnswer}
         />
       )}
 
