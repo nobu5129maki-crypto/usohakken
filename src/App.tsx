@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { WarningStep } from './components/WarningStep'
 import { CalibrationStep } from './components/CalibrationStep'
 import { QuestionSetupStep } from './components/QuestionSetupStep'
@@ -11,6 +11,7 @@ import { useAudioAnalyzer } from './hooks/useAudioAnalyzer'
 import {
   calculateLieProbability,
   DEFAULT_TARGET_QUESTIONS,
+  medianDelay,
   type QuestionResult,
   type Step,
 } from './types'
@@ -21,6 +22,7 @@ function App() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [results, setResults] = useState<QuestionResult[]>([])
   const [textMode, setTextMode] = useState(false)
+  const [baselineDelays, setBaselineDelays] = useState<number[]>([])
 
   const activeQuestions = useMemo(
     () => questions.map((q) => q.trim()).filter(Boolean),
@@ -37,21 +39,16 @@ function App() {
     resetTiming,
     getTiming,
     noteTextAnswer,
+    stopAnalyzer,
   } = useAudioAnalyzer()
 
-  useEffect(() => {
-    if (step !== 'calibration' || isReady || textMode) return
-    let cancelled = false
-    const timeout = new Promise<boolean>((resolve) => {
-      window.setTimeout(() => resolve(false), 8000)
-    })
-    Promise.race([startAnalyzer(), timeout]).then((ok) => {
-      if (!cancelled && !ok) setTextMode(true)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [step, isReady, textMode, startAnalyzer])
+  const hasVoice = useCallback(() => getTiming().voiceStart != null, [getTiming])
+
+  const captureBaseline = useCallback(() => {
+    const delay = getTiming().responseDelay
+    if (delay == null) return
+    setBaselineDelays((prev) => [...prev, delay])
+  }, [getTiming])
 
   const handleCalibrationComplete = useCallback(() => {
     setStep('questionSetup')
@@ -72,13 +69,17 @@ function App() {
     const currentQuestion = activeQuestions[currentQuestionIndex]
     if (!currentQuestion) return
 
-    const analysisResult = calculateLieProbability(getTiming())
+    const analysisResult = calculateLieProbability(
+      getTiming(),
+      textMode ? null : medianDelay(baselineDelays),
+      textMode,
+    )
     setResults((prev) => [
       ...prev,
       { question: currentQuestion, answer, result: analysisResult },
     ])
     setStep('analyzing')
-  }, [activeQuestions, currentQuestionIndex, getTiming])
+  }, [activeQuestions, baselineDelays, currentQuestionIndex, getTiming, textMode])
 
   const handleAnalyzingComplete = useCallback(() => {
     setStep('result')
@@ -93,13 +94,23 @@ function App() {
   const handleReset = useCallback(() => {
     resetTiming()
     setResults([])
+    setBaselineDelays([])
     setCurrentQuestionIndex(0)
     setStep('warning')
   }, [resetTiming])
 
   const handleWarningNext = useCallback(() => {
     setStep('calibration')
-  }, [])
+    if (textMode || isReady) return
+    void startAnalyzer().then((ok) => {
+      if (!ok) setTextMode(true)
+    })
+  }, [isReady, startAnalyzer, textMode])
+
+  const handleUseText = useCallback(() => {
+    setTextMode(true)
+    stopAnalyzer()
+  }, [stopAnalyzer])
 
   const isLastQuestion = currentQuestionIndex >= activeQuestions.length - 1
   const currentQuestion = activeQuestions[currentQuestionIndex] ?? ''
@@ -116,6 +127,10 @@ function App() {
           isButtonPressed={isButtonPressed}
           waveformData={waveformData}
           textMode={textMode}
+          micReady={isReady}
+          onUseText={handleUseText}
+          hasVoice={hasVoice}
+          onCaptured={captureBaseline}
         />
       )}
 
@@ -147,6 +162,8 @@ function App() {
           waveformData={waveformData}
           textMode={textMode}
           onTextTiming={noteTextAnswer}
+          hasVoice={hasVoice}
+          onUseText={handleUseText}
         />
       )}
 
@@ -156,6 +173,8 @@ function App() {
           questionIndex={currentQuestionIndex}
           totalQuestions={activeQuestions.length}
           onComplete={handleAnalyzingComplete}
+          textMode={textMode}
+          hasBaseline={!textMode && baselineDelays.length > 0}
         />
       )}
 

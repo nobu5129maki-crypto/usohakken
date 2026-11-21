@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useCountdown } from '../hooks/useCountdown'
+import { HoldButton } from './HoldButton'
 
 interface QuestionStepProps {
   question: string
@@ -12,6 +13,8 @@ interface QuestionStepProps {
   waveformData: number[]
   textMode?: boolean
   onTextTiming?: (elapsedSeconds: number) => void
+  hasVoice?: () => boolean
+  onUseText?: () => void
 }
 
 export function QuestionStep({
@@ -25,11 +28,15 @@ export function QuestionStep({
   waveformData,
   textMode = false,
   onTextTiming,
+  hasVoice,
+  onUseText,
 }: QuestionStepProps) {
   const [showAnswer, setShowAnswer] = useState(false)
   const [answered, setAnswered] = useState(false)
   const [draft, setDraft] = useState('')
+  const [hint, setHint] = useState('')
   const shownAt = useRef(0)
+  const answeredRef = useRef(false)
 
   const countdown = useCountdown(3, true, () => {
     shownAt.current = Date.now()
@@ -42,17 +49,23 @@ export function QuestionStep({
 
   const handleRelease = () => {
     onButtonRelease()
-    if (showAnswer && !answered) {
-      setAnswered(true)
-      setTimeout(() => onComplete(), 600)
+    if (!showAnswer || answeredRef.current) return
+    if (!hasVoice?.()) {
+      setHint('声が検出できませんでした。ボタンを押したまま、はっきり話してください。')
+      return
     }
+    setHint('')
+    answeredRef.current = true
+    setAnswered(true)
+    setTimeout(() => onComplete(), 600)
   }
 
   const submitText = () => {
     const value = draft.trim()
-    if (!showAnswer || answered || !value) return
+    if (!showAnswer || answeredRef.current || !value) return
     const elapsed = Math.max(0.05, (Date.now() - (shownAt.current || Date.now())) / 1000)
     onTextTiming?.(elapsed)
+    answeredRef.current = true
     setAnswered(true)
     setTimeout(() => onComplete(value), 300)
   }
@@ -107,30 +120,25 @@ export function QuestionStep({
                   placeholder="はい / いいえ"
                   aria-label="文字での回答"
                 />
-                <button className="btn-primary btn-start" onClick={submitText} disabled={!draft.trim()}>
+                <button type="button" className="btn-primary btn-start" onClick={submitText} disabled={!draft.trim() || answered}>
                   文字で回答する
                 </button>
               </div>
             ) : (
-            <button
+            <>
+            {hint ? <p className="voice-hint" role="alert">{hint}</p> : null}
+            <HoldButton
               className={`btn-measure btn-alert ${isButtonPressed ? 'pressed' : ''}`}
-              onTouchStart={(e) => {
-                e.preventDefault()
-                onButtonPress()
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault()
-                handleRelease()
-              }}
-              onMouseDown={onButtonPress}
-              onMouseUp={handleRelease}
-              onMouseLeave={() => {
-                if (isButtonPressed) handleRelease()
-              }}
+              onPress={onButtonPress}
+              onRelease={handleRelease}
             >
               <span className="btn-measure-icon">🔴</span>
               <span>測定ボタンを押しっぱなしにして声で回答してください</span>
+            </HoldButton>
+            <button type="button" className="btn-text-fallback" onClick={onUseText}>
+              マイクを使わず文字で回答する
             </button>
+            </>
             )}
           </>
         ) : (

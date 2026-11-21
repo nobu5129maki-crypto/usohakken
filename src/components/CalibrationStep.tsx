@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { CALIBRATION_QUESTIONS, getDayOfWeek } from '../types'
 import { useProgress } from '../hooks/useCountdown'
+import { HoldButton } from './HoldButton'
 
 interface CalibrationStepProps {
   onNext: () => void
@@ -9,6 +10,10 @@ interface CalibrationStepProps {
   isButtonPressed: boolean
   waveformData: number[]
   textMode?: boolean
+  micReady?: boolean
+  onUseText?: () => void
+  hasVoice?: () => boolean
+  onCaptured?: () => void
 }
 
 export function CalibrationStep({
@@ -18,11 +23,17 @@ export function CalibrationStep({
   isButtonPressed,
   waveformData,
   textMode = false,
+  micReady = false,
+  onUseText,
+  hasVoice,
+  onCaptured,
 }: CalibrationStepProps) {
   const [currentQ, setCurrentQ] = useState(0)
   const [analyzing, setAnalyzing] = useState(false)
   const [answered, setAnswered] = useState(false)
   const [draft, setDraft] = useState('')
+  const [hint, setHint] = useState('')
+  const lockRef = useRef(false)
 
   const day = getDayOfWeek()
   const questions = CALIBRATION_QUESTIONS.map((q) =>
@@ -34,12 +45,16 @@ export function CalibrationStep({
   })
 
   const advance = () => {
-    if (answered) return
+    if (lockRef.current) return
+    lockRef.current = true
     setAnswered(true)
+    setHint('')
     if (currentQ < questions.length - 1) {
       setTimeout(() => {
         setCurrentQ((c) => c + 1)
+        lockRef.current = false
         setAnswered(false)
+        setDraft('')
       }, 800)
     } else {
       setAnalyzing(true)
@@ -48,11 +63,17 @@ export function CalibrationStep({
 
   const handleRelease = () => {
     onButtonRelease()
+    if (lockRef.current) return
+    if (!hasVoice?.()) {
+      setHint('声が検出できませんでした。ボタンを押したまま、はっきり話してください。')
+      return
+    }
+    onCaptured?.()
     advance()
   }
 
   const submitText = () => {
-    if (!draft.trim()) return
+    if (!draft.trim() || lockRef.current) return
     setDraft('')
     advance()
   }
@@ -111,8 +132,15 @@ export function CalibrationStep({
               placeholder="はい / いいえ"
               aria-label="文字での回答"
             />
-            <button className="btn-primary btn-cyber" onClick={submitText} disabled={!draft.trim()}>
+            <button type="button" className="btn-primary btn-cyber" onClick={submitText} disabled={!draft.trim() || answered}>
               文字で回答する
+            </button>
+          </div>
+        ) : !micReady ? (
+          <div className="mic-wait">
+            <p className="text-answer-note">マイクの使用を確認しています。ブラウザの許可を選んでください。</p>
+            <button type="button" className="btn-primary btn-cyber" onClick={onUseText}>
+              マイクを使わず文字で回答する
             </button>
           </div>
         ) : (
@@ -132,24 +160,18 @@ export function CalibrationStep({
               </div>
             </div>
 
-            <button
+            {hint ? <p className="voice-hint" role="alert">{hint}</p> : null}
+
+            <HoldButton
               className={`btn-measure btn-cyber ${isButtonPressed ? 'pressed' : ''}`}
-              onTouchStart={(e) => {
-                e.preventDefault()
-                onButtonPress()
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault()
-                handleRelease()
-              }}
-              onMouseDown={onButtonPress}
-              onMouseUp={handleRelease}
-              onMouseLeave={() => {
-                if (isButtonPressed) handleRelease()
-              }}
+              onPress={onButtonPress}
+              onRelease={handleRelease}
             >
               <span className="btn-measure-icon">🔵</span>
               <span>測定ボタン（押し続ける）</span>
+            </HoldButton>
+            <button type="button" className="btn-text-fallback" onClick={onUseText}>
+              マイクを使わず文字で回答する
             </button>
           </>
         )}

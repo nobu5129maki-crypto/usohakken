@@ -8,20 +8,37 @@ if (empty($_SESSION['uh_csrf']) || !is_string($_SESSION['uh_csrf'])) {
 
 $error = '';
 $postedId = '';
+if (!isset($_SESSION['uh_fail']) || !is_int($_SESSION['uh_fail'])) {
+    $_SESSION['uh_fail'] = 0;
+}
+if (!isset($_SESSION['uh_fail_at']) || !is_int($_SESSION['uh_fail_at'])) {
+    $_SESSION['uh_fail_at'] = 0;
+}
 if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $postedId = isset($_POST['login_id']) ? trim((string) $_POST['login_id']) : '';
     $postedPassword = isset($_POST['password']) ? (string) $_POST['password'] : '';
     $postedToken = isset($_POST['csrf']) ? (string) $_POST['csrf'] : '';
     $tokenOk = is_string($_SESSION['uh_csrf']) && hash_equals($_SESSION['uh_csrf'], $postedToken);
-    if ($tokenOk && uh_check_login($postedId, $postedPassword)) {
+    $lockedFor = 0;
+    if ($_SESSION['uh_fail'] >= 5) {
+        $lockedFor = 60 - (time() - $_SESSION['uh_fail_at']);
+    }
+    if ($lockedFor > 0) {
+        $error = '連続で違ったため、しばらく待ってから再度入力してください';
+    } elseif ($tokenOk && uh_check_login($postedId, $postedPassword)) {
         session_regenerate_id(true);
         $_SESSION['uh_user'] = $postedId;
+        $_SESSION['uh_fail'] = 0;
+        $_SESSION['uh_fail_at'] = 0;
         $_SESSION['uh_csrf'] = bin2hex(random_bytes(16));
         header('Location: ./', true, 303);
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         exit;
+    } else {
+        $_SESSION['uh_fail'] = $_SESSION['uh_fail'] + 1;
+        $_SESSION['uh_fail_at'] = time();
+        $error = 'IDまたはパスワードが違います';
     }
-    $error = 'IDまたはパスワードが違います';
 }
 
 if (uh_logged_in()) {
@@ -40,7 +57,7 @@ if (uh_logged_in()) {
         exit;
     }
     $save = <<<'HTML'
-<script>(function(){try{var i=sessionStorage.getItem("usohakken_pending_id");var p=sessionStorage.getItem("usohakken_pending_password");if(i&&p){localStorage.setItem("usohakken_login_id",i);localStorage.setItem("usohakken_login_password",p);sessionStorage.removeItem("usohakken_pending_id");sessionStorage.removeItem("usohakken_pending_password");}}catch(e){}})();</script>
+<script>(function(){try{localStorage.removeItem("usohakken_login_password");sessionStorage.removeItem("usohakken_pending_id");sessionStorage.removeItem("usohakken_pending_password");}catch(e){}})();</script>
 <script>if("serviceWorker"in navigator){navigator.serviceWorker.register("./sw.js",{scope:"./"}).catch(function(){});}</script>
 HTML;
     $html = preg_replace('/<\\/head>/', $save . '</head>', $html, 1);
@@ -153,7 +170,7 @@ http_response_code(200);
             <h1>嘘発見モード</h1>
             <p class="lead">入るには ID とパスワードが必要です</p>
         </header>
-        <form method="post" action="" autocomplete="off">
+        <form method="post" action="" autocomplete="on">
             <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($_SESSION['uh_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
             <p id="loginError" class="error" role="alert"<?php echo $error === '' ? ' hidden' : ''; ?>><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></p>
             <div class="field">
@@ -172,11 +189,9 @@ http_response_code(200);
     </main>
     <script>
         var idKey = "usohakken_login_id";
-        var passwordKey = "usohakken_login_password";
         var form = document.querySelector("form");
         var idInput = document.getElementById("login_id");
         var passwordInput = document.getElementById("password");
-        var errorBox = document.getElementById("loginError");
 
         document.getElementById("togglePassword").addEventListener("click", function () {
             var showing = passwordInput.type === "text";
@@ -187,31 +202,19 @@ http_response_code(200);
 
         form.addEventListener("submit", function () {
             try {
-                sessionStorage.setItem("usohakken_pending_id", idInput.value.trim());
-                sessionStorage.setItem("usohakken_pending_password", passwordInput.value);
+                localStorage.setItem(idKey, idInput.value.trim());
+                localStorage.removeItem("usohakken_login_password");
+                sessionStorage.removeItem("usohakken_pending_id");
+                sessionStorage.removeItem("usohakken_pending_password");
             } catch (err) {}
         });
 
         try {
-            var failed = errorBox && !errorBox.hasAttribute("hidden") && errorBox.textContent;
-            if (failed) {
-                localStorage.removeItem(passwordKey);
-                sessionStorage.removeItem("usohakken_pending_id");
-                sessionStorage.removeItem("usohakken_pending_password");
-            }
+            localStorage.removeItem("usohakken_login_password");
+            sessionStorage.removeItem("usohakken_pending_id");
+            sessionStorage.removeItem("usohakken_pending_password");
             var savedId = localStorage.getItem(idKey) || "";
-            var savedPassword = localStorage.getItem(passwordKey) || "";
-            if (!failed && savedId && savedPassword) {
-                idInput.value = savedId;
-                passwordInput.value = savedPassword;
-                try {
-                    sessionStorage.setItem("usohakken_pending_id", savedId);
-                    sessionStorage.setItem("usohakken_pending_password", savedPassword);
-                } catch (err) {}
-                form.submit();
-            } else if (savedId && !idInput.value) {
-                idInput.value = savedId;
-            }
+            if (savedId && !idInput.value) idInput.value = savedId;
         } catch (err) {}
     </script>
 </body>

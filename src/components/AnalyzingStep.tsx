@@ -6,6 +6,8 @@ interface AnalyzingStepProps {
   questionIndex: number
   totalQuestions: number
   onComplete: () => void
+  textMode?: boolean
+  hasBaseline?: boolean
 }
 
 const ANALYSIS_LINES = [
@@ -20,31 +22,36 @@ export function AnalyzingStep({
   questionIndex,
   totalQuestions,
   onComplete,
+  textMode = false,
+  hasBaseline = false,
 }: AnalyzingStepProps) {
   const [visibleLines, setVisibleLines] = useState<number>(0)
   const [waitSeconds, setWaitSeconds] = useState(5)
 
   useEffect(() => {
+    let intervalId = 0
+    let finished = false
     const timers = ANALYSIS_LINES.map((line, i) =>
-      setTimeout(() => setVisibleLines(i + 1), line.delay),
+      window.setTimeout(() => setVisibleLines(i + 1), line.delay),
     )
 
-    const waitTimer = setTimeout(() => {
-      const interval = setInterval(() => {
-        setWaitSeconds((s) => {
-          if (s <= 1) {
-            clearInterval(interval)
-            onComplete()
-            return 0
-          }
-          return s - 1
-        })
+    const waitTimer = window.setTimeout(() => {
+      let left = 5
+      intervalId = window.setInterval(() => {
+        left -= 1
+        setWaitSeconds(Math.max(0, left))
+        if (left <= 0 && !finished) {
+          finished = true
+          window.clearInterval(intervalId)
+          onComplete()
+        }
       }, 1000)
     }, 3800)
 
     return () => {
       timers.forEach(clearTimeout)
       clearTimeout(waitTimer)
+      if (intervalId) clearInterval(intervalId)
     }
   }, [onComplete])
 
@@ -62,13 +69,17 @@ export function AnalyzingStep({
         <div className="analysis-lines">
           {visibleLines >= 1 && (
             <div className="analysis-line">
-              <span className="analysis-text">基準値データとの照合中...</span>
+              <span className="analysis-text">
+                {hasBaseline ? '基準値データとの照合中...' : textMode ? '文字回答の時間を解析中...' : '応答速度を解析中...'}
+              </span>
               <span className="analysis-ok">[OK]</span>
             </div>
           )}
           {visibleLines >= 2 && (
             <div className="analysis-line">
-              <span className="analysis-text">声の周波数のブレ（微細振動）を検出中...</span>
+              <span className="analysis-text">
+                {textMode ? '回答までの待ち時間を検出中...' : '声の大きさの変化を検出中...'}
+              </span>
               <span className="analysis-ok">[OK]</span>
             </div>
           )}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { TimingData } from '../types'
+import { voiceGate, type TimingData } from '../types'
 
 interface UseAudioAnalyzerReturn {
   isReady: boolean
@@ -26,8 +26,7 @@ const EMPTY_TIMING: TimingData = {
   voiceDuration: null,
 }
 
-const VOICE_THRESHOLD = 0.08
-const SILENCE_FRAMES = 8
+const SILENCE_FRAMES = 18
 
 export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
   const [isReady, setIsReady] = useState(false)
@@ -45,6 +44,7 @@ export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
   const voiceActiveRef = useRef(false)
   const silenceCountRef = useRef(0)
   const sessionStartRef = useRef<number>(0)
+  const startSeqRef = useRef(0)
 
   const computeHoldMismatch = useCallback(() => {
     const t = timingRef.current
@@ -59,31 +59,35 @@ export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
     const analyser = analyserRef.current
     if (!analyser) return
 
-    const bufferLength = analyser.frequencyBinCount
-    const dataArray = new Uint8Array(bufferLength)
-    analyser.getByteFrequencyData(dataArray)
+    const freqLength = analyser.frequencyBinCount
+    const freq = new Uint8Array(freqLength)
+    analyser.getByteFrequencyData(freq)
 
-    let sum = 0
+    const time = new Uint8Array(analyser.fftSize)
+    analyser.getByteTimeDomainData(time)
+    let sumSq = 0
+    for (let i = 0; i < time.length; i++) {
+      const sample = (time[i] - 128) / 128
+      sumSq += sample * sample
+    }
+    const rms = Math.sqrt(sumSq / time.length)
+
     const bars: number[] = []
     const barCount = 32
-    const step = Math.floor(bufferLength / barCount)
-
+    const step = Math.max(1, Math.floor(freqLength / barCount))
     for (let i = 0; i < barCount; i++) {
       let barSum = 0
       for (let j = 0; j < step; j++) {
-        barSum += dataArray[i * step + j]
+        barSum += freq[i * step + j] ?? 0
       }
-      const normalized = barSum / step / 255
-      bars.push(normalized)
-      sum += normalized
+      bars.push(Math.min(1, (barSum / step / 255) * 3.2))
     }
 
-    const avg = sum / barCount
-    setAmplitude(avg)
+    setAmplitude(rms)
     setWaveformData(bars)
 
     const now = Date.now()
-    const isVoice = avg > VOICE_THRESHOLD
+    const isVoice = voiceGate(rms, voiceActiveRef.current)
 
     if (isVoice) {
       silenceCountRef.current = 0
@@ -114,6 +118,8 @@ export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
   }, [computeHoldMismatch])
 
   const startAnalyzer = useCallback(async (): Promise<boolean> => {
+    if (streamRef.current) return true
+    const seq = ++startSeqRef.current
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -122,10 +128,15 @@ export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
           autoGainControl: true,
         },
       })
+      if (seq !== startSeqRef.current) {
+        stream.getTracks().forEach((t) => t.stop())
+        return false
+      }
 
       streamRef.current = stream
       const ctx = new AudioContext()
       audioContextRef.current = ctx
+      if (ctx.state === 'suspended') void ctx.resume()
 
       const source = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
@@ -139,12 +150,17 @@ export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
       analyze()
       return true
     } catch {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop())
+        streamRef.current = null
+      }
       setIsReady(false)
       return false
     }
   }, [analyze])
 
   const stopAnalyzer = useCallback(() => {
+    startSeqRef.current += 1
     cancelAnimationFrame(animationRef.current)
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop())
@@ -159,6 +175,8 @@ export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
   }, [])
 
   const onButtonPress = useCallback(() => {
+    const ctx = audioContextRef.current
+    if (ctx && ctx.state === 'suspended') void ctx.resume()
     const now = Date.now()
     isButtonPressedRef.current = true
     setIsButtonPressed(true)
@@ -198,11 +216,11 @@ export function useAudioAnalyzer(): UseAudioAnalyzerReturn {
     const now = Date.now()
     const elapsedMs = elapsed * 1000
     timingRef.current.buttonPressStart = now - elapsedMs
-    timingRef.current.voiceStart = now - Math.min(elapsedMs, 400)
-    timingRef.current.voiceEnd = now
+    timingRef.current.voiceStart = null
+    timingRef.current.voiceEnd = null
     timingRef.current.buttonPressEnd = now
     timingRef.current.responseDelay = Math.round(elapsed * 100) / 100
-    timingRef.current.voiceDuration = Math.round(Math.min(Math.max(elapsed, 0.3), 4) * 100) / 100
+    timingRef.current.voiceDuration = null
     timingRef.current.holdMismatch = 0
     setTiming({ ...timingRef.current })
   }, [])
